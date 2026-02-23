@@ -218,7 +218,32 @@ def process():
 
         result = subprocess.run(cmd, capture_output=True, text=True)
         if result.returncode != 0:
-            flash(f"Ошибка FFmpeg: {result.stderr[:500]}", "error")
+            # При ошибке с аудио — повторить без аудио
+            if not no_audio and not preview:
+                cmd_retry = build_ffmpeg_command(
+                    ffmpeg=ffmpeg,
+                    bg=str(bg_path),
+                    mask=str(mask_path),
+                    video=str(video_path),
+                    output=str(output_path),
+                    opacity=opacity,
+                    bitrate=bitrate,
+                    tone=tone,
+                    darkness=darkness,
+                    include_audio=False,
+                    preview=preview,
+                    bg_width=bg_w,
+                    bg_height=bg_h,
+                    video_duration=vid_duration,
+                )
+                result2 = subprocess.run(cmd_retry, capture_output=True, text=True)
+                if result2.returncode == 0:
+                    return redirect(url_for("result", job_id=job_id))
+
+            # Показываем последние строки stderr — там суть ошибки
+            stderr_lines = result.stderr.strip().splitlines()
+            error_tail = "\n".join(stderr_lines[-5:]) if stderr_lines else "Неизвестная ошибка"
+            flash(f"Ошибка FFmpeg:\n{error_tail}", "error")
             return redirect(url_for("index"))
 
         return redirect(url_for("result", job_id=job_id))
