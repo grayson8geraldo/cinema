@@ -13,9 +13,10 @@
   --mask      Маска экрана (чёрно-белая, того же размера что и фон)
   --video     Исходное видео для наложения
   -o          Выходной файл (по умолчанию: output_cinema.mp4)
-  --bitrate   Битрейт выходного видео (по умолчанию: 3500k)
-  --no-audio  Не включать аудиодорожку из видео
-  --preview   Создать превью одного кадра (PNG) вместо видео
+  --bitrate         Битрейт выходного видео (по умолчанию: 3500k)
+  --screen-opacity  Сила блика screen-blend 0.0-1.0 (по умолчанию: 0.3)
+  --no-audio        Не включать аудиодорожку из видео
+  --preview         Создать превью одного кадра (PNG) вместо видео
 """
 
 import argparse
@@ -84,6 +85,7 @@ def build_ffmpeg_command(
     video: str,
     output: str,
     bitrate: str,
+    screen_opacity: float,
     include_audio: bool,
     preview: bool,
     bg_width: int,
@@ -101,6 +103,7 @@ def build_ffmpeg_command(
     # 4. Накладываем замаскированное видео на фон (overlay)
     # 5. Повторный blend фона поверх композита в режиме screen —
     #    создаёт блик/свечение экрана, имитируя реальную проекцию
+    #    all_opacity контролирует силу блика (0.0 = без блика, 1.0 = полный screen)
     filter_complex = (
         f"[0:v]loop=loop=-1:size=32767:start=0,split=2[bg1][bg2];"
         f"[2:v]loop=loop=-1:size=32767:start=0[mask_loop];"
@@ -108,7 +111,7 @@ def build_ffmpeg_command(
         f"crop={w}:{h}[scaled_vid];"
         f"[scaled_vid][mask_loop]alphamerge[masked_vid];"
         f"[bg1][masked_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[base_comp];"
-        f"[base_comp][bg2]blend=all_mode=screen[outv]"
+        f"[base_comp][bg2]blend=all_mode=screen:all_opacity={screen_opacity}[outv]"
     )
 
     cmd = [
@@ -154,6 +157,10 @@ def main() -> None:
     parser.add_argument("--video", required=True, help="Исходное видео")
     parser.add_argument("-o", "--output", default="output_cinema.mp4", help="Выходной файл")
     parser.add_argument("--bitrate", default="3500k", help="Битрейт видео (по умолчанию: 3500k)")
+    parser.add_argument(
+        "--screen-opacity", type=float, default=0.3,
+        help="Сила блика screen-blend 0.0-1.0 (по умолчанию: 0.3)",
+    )
     parser.add_argument("--no-audio", action="store_true", help="Не включать аудио")
     parser.add_argument(
         "--preview", action="store_true",
@@ -161,6 +168,8 @@ def main() -> None:
     )
 
     args = parser.parse_args()
+
+    args.screen_opacity = max(0.0, min(1.0, args.screen_opacity))
 
     ffmpeg = check_ffmpeg()
     ffprobe = shutil.which("ffprobe")
@@ -183,6 +192,7 @@ def main() -> None:
         video=args.video,
         output=args.output,
         bitrate=args.bitrate,
+        screen_opacity=args.screen_opacity,
         include_audio=not args.no_audio,
         preview=args.preview,
         bg_width=bg_w,
@@ -196,6 +206,7 @@ def main() -> None:
     print(f"  Видео:    {args.video}")
     print(f"  Выход:    {args.output}")
     print(f"  Битрейт:  {args.bitrate}")
+    print(f"  Блик:     {args.screen_opacity}")
     print()
 
     result = subprocess.run(cmd, capture_output=True, text=True)

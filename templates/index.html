@@ -376,6 +376,16 @@
                 <div class="section-title">Параметры</div>
 
                 <div class="field">
+                    <label>Сила блика (screen blend)</label>
+                    <div class="range-row">
+                        <input type="range" name="screen_opacity" id="screenOpacityRange"
+                               min="0" max="1" step="0.05" value="0.3"
+                               oninput="document.getElementById('screenOpacityVal').textContent = this.value">
+                        <span class="range-value" id="screenOpacityVal">0.3</span>
+                    </div>
+                </div>
+
+                <div class="field">
                     <label for="bitrate">Битрейт видео</label>
                     <input type="text" name="bitrate" id="bitrate" value="3500k"
                            placeholder="3500k">

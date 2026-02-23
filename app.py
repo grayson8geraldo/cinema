@@ -173,6 +173,12 @@ def process():
         if not bitrate:
             bitrate = "3500k"
 
+        try:
+            screen_opacity = float(request.form.get("screen_opacity", 0.3))
+        except (ValueError, TypeError):
+            screen_opacity = 0.3
+        screen_opacity = max(0.0, min(1.0, screen_opacity))
+
         preview = request.form.get("preview") == "on"
         no_audio = request.form.get("no_audio") == "on"
 
@@ -195,6 +201,7 @@ def process():
             video=str(video_path),
             output=str(output_path),
             bitrate=bitrate,
+            screen_opacity=screen_opacity,
             include_audio=not no_audio,
             preview=preview,
             bg_width=bg_w,
@@ -213,6 +220,7 @@ def process():
                     video=str(video_path),
                     output=str(output_path),
                     bitrate=bitrate,
+                    screen_opacity=screen_opacity,
                     include_audio=False,
                     preview=preview,
                     bg_width=bg_w,
