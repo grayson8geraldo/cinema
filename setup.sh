@@ -24,11 +24,22 @@ fi
 
 echo "[2/3] FFmpeg: $(ffmpeg -version | head -1)"
 
-# Установка Python-зависимостей
+# Создание виртуального окружения и установка зависимостей
 echo "[3/3] Установка Python-пакетов..."
-python3 -m pip install -r requirements.txt -q
+
+if [ ! -d "venv" ]; then
+    python3 -m venv venv
+    echo "  Виртуальное окружение создано: venv/"
+fi
+
+source venv/bin/activate
+pip install -r requirements.txt -q
 
 echo ""
 echo "=== Готово! ==="
-echo "Запуск:  python3 app.py"
+echo ""
+echo "Запуск:"
+echo "  source venv/bin/activate"
+echo "  python3 app.py"
+echo ""
 echo "Откройте: http://localhost:5000"

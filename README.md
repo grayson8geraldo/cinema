@@ -11,10 +11,11 @@
 git clone https://github.com/grayson8geraldo/cinema.git
 cd cinema
 
-# 2. Установить зависимости
+# 2. Установить зависимости (создаст venv автоматически)
 bash setup.sh
 
-# 3. Запустить
+# 3. Активировать окружение и запустить
+source venv/bin/activate
 python3 app.py
 ```
 
