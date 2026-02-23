@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cinema Composer</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: #0d0d0d;
+            color: #e0e0e0;
+            min-height: 100vh;
+        }
+
+        .header {
+            background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+            padding: 24px 0;
+            border-bottom: 1px solid #2a2a4a;
+            text-align: center;
+        }
+
+        .header h1 {
+            font-size: 28px;
+            font-weight: 600;
+            color: #f0c040;
+            letter-spacing: 1px;
+        }
+
+        .header p {
+            margin-top: 6px;
+            color: #8888aa;
+            font-size: 14px;
+        }
+
+        .container {
+            max-width: 720px;
+            margin: 0 auto;
+            padding: 32px 20px 60px;
+        }
+
+        .flash-messages {
+            margin-bottom: 20px;
+        }
+
+        .flash {
+            padding: 12px 16px;
+            border-radius: 8px;
+            margin-bottom: 8px;
+            font-size: 14px;
+        }
+
+        .flash.error {
+            background: #3d1515;
+            border: 1px solid #6b2020;
+            color: #ff8888;
+        }
+
+        .flash.success {
+            background: #153d15;
+            border: 1px solid #206b20;
+            color: #88ff88;
+        }
+
+        .section {
+            background: #1a1a1a;
+            border: 1px solid #2a2a2a;
+            border-radius: 12px;
+            padding: 24px;
+            margin-bottom: 20px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            color: #f0c040;
+            margin-bottom: 16px;
+            padding-bottom: 8px;
+            border-bottom: 1px solid #2a2a2a;
+        }
+
+        label {
+            display: block;
+            font-size: 13px;
+            font-weight: 500;
+            color: #aaa;
+            margin-bottom: 6px;
+        }
+
+        .field {
+            margin-bottom: 16px;
+        }
+
+        .field:last-child {
+            margin-bottom: 0;
+        }
+
+        input[type="file"] {
+            width: 100%;
+            padding: 10px 12px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+            cursor: pointer;
+        }
+
+        input[type="file"]::file-selector-button {
+            background: #2a2a4a;
+            color: #e0e0e0;
+            border: 1px solid #444;
+            border-radius: 6px;
+            padding: 6px 14px;
+            margin-right: 12px;
+            cursor: pointer;
+            font-size: 13px;
+        }
+
+        input[type="file"]::file-selector-button:hover {
+            background: #3a3a5a;
+        }
+
+        input[type="number"],
+        input[type="text"],
+        select {
+            width: 100%;
+            padding: 10px 12px;
+            background: #111;
+            border: 1px solid #333;
+            border-radius: 8px;
+            color: #e0e0e0;
+            font-size: 14px;
+        }
+
+        input[type="range"] {
+            width: 100%;
+            accent-color: #f0c040;
+        }
+
+        select {
+            cursor: pointer;
+        }
+
+        .range-row {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .range-row input[type="range"] {
+            flex: 1;
+        }
+
+        .range-value {
+            min-width: 40px;
+            text-align: right;
+            font-size: 14px;
+            color: #f0c040;
+            font-weight: 600;
+        }
+
+        .row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 16px;
+        }
+
+        .row-3 {
+            display: grid;
+            grid-template-columns: 1fr 1fr 1fr;
+            gap: 16px;
+        }
+
+        .mask-tabs {
+            display: flex;
+            gap: 0;
+            margin-bottom: 16px;
+        }
+
+        .mask-tab {
+            flex: 1;
+            padding: 10px;
+            text-align: center;
+            cursor: pointer;
+            background: #111;
+            border: 1px solid #333;
+            color: #888;
+            font-size: 13px;
+            font-weight: 500;
+            transition: all 0.2s;
+        }
+
+        .mask-tab:first-child { border-radius: 8px 0 0 8px; }
+        .mask-tab:last-child { border-radius: 0 8px 8px 0; }
+
+        .mask-tab.active {
+            background: #2a2a4a;
+            border-color: #f0c040;
+            color: #f0c040;
+        }
+
+        .mask-panel { display: none; }
+        .mask-panel.active { display: block; }
+
+        .rect-inputs {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 12px;
+        }
+
+        .checkbox-row {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+
+        .checkbox-row input[type="checkbox"] {
+            width: 18px;
+            height: 18px;
+            accent-color: #f0c040;
+            cursor: pointer;
+        }
+
+        .checkbox-row label {
+            display: inline;
+            margin: 0;
+            cursor: pointer;
+            color: #ccc;
+            font-size: 14px;
+        }
+
+        .btn-submit {
+            width: 100%;
+            padding: 14px;
+            background: linear-gradient(135deg, #f0c040 0%, #e6a820 100%);
+            color: #111;
+            border: none;
+            border-radius: 10px;
+            font-size: 16px;
+            font-weight: 700;
+            cursor: pointer;
+            letter-spacing: 0.5px;
+            transition: opacity 0.2s;
+        }
+
+        .btn-submit:hover {
+            opacity: 0.9;
+        }
+
+        .btn-submit:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+
+        .spinner {
+            display: none;
+            text-align: center;
+            padding: 20px;
+            color: #f0c040;
+            font-size: 14px;
+        }
+
+        .spinner.active {
+            display: block;
+        }
+
+        .spinner-icon {
+            display: inline-block;
+            width: 24px;
+            height: 24px;
+            border: 3px solid #333;
+            border-top-color: #f0c040;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+            margin-right: 10px;
+            vertical-align: middle;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .hint {
+            font-size: 12px;
+            color: #666;
+            margin-top: 4px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>Cinema Composer</h1>
+        <p>Композитинг видео на экран кинотеатра</p>
+    </div>
+
+    <div class="container">
+        {% with messages = get_flashed_messages(with_categories=true) %}
+        {% if messages %}
+        <div class="flash-messages">
+            {% for category, message in messages %}
+            <div class="flash {{ category }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% endwith %}
+
+        <form id="mainForm" action="/process" method="POST" enctype="multipart/form-data">
+
+            <!-- Файлы -->
+            <div class="section">
+                <div class="section-title">Файлы</div>
+
+                <div class="field">
+                    <label for="bg">Фон кинозала (PNG / JPG)</label>
+                    <input type="file" id="bg" name="bg" accept=".png,.jpg,.jpeg,.bmp" required>
+                </div>
+
+                <div class="field">
+                    <label for="video">Видео для наложения (MP4 / AVI / MOV / MKV)</label>
+                    <input type="file" id="video" name="video" accept=".mp4,.avi,.mov,.mkv,.webm" required>
+                </div>
+            </div>
+
+            <!-- Маска -->
+            <div class="section">
+                <div class="section-title">Маска экрана</div>
+
+                <div class="mask-tabs">
+                    <div class="mask-tab active" data-panel="upload" onclick="switchMaskTab('upload')">
+                        Загрузить файл
+                    </div>
+                    <div class="mask-tab" data-panel="create" onclick="switchMaskTab('create')">
+                        Создать из координат
+                    </div>
+                </div>
+
+                <input type="hidden" id="mask_mode" name="mask_mode" value="upload">
+
+                <div id="panel-upload" class="mask-panel active">
+                    <div class="field">
+                        <label for="mask">Маска экрана (ч/б изображение)</label>
+                        <input type="file" id="mask" name="mask" accept=".png,.jpg,.jpeg,.bmp">
+                        <div class="hint">Белая область — экран, чёрная — фон</div>
+                    </div>
+                </div>
+
+                <div id="panel-create" class="mask-panel">
+                    <div class="hint" style="margin-bottom: 12px;">
+                        Координаты прямоугольника экрана в пикселях (относительно размера фона)
+                    </div>
+                    <div class="rect-inputs">
+                        <div class="field">
+                            <label>Левая граница (X)</label>
+                            <input type="number" name="rect_left" value="200" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Верхняя граница (Y)</label>
+                            <input type="number" name="rect_top" value="400" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Правая граница (X)</label>
+                            <input type="number" name="rect_right" value="880" min="0">
+                        </div>
+                        <div class="field">
+                            <label>Нижняя граница (Y)</label>
+                            <input type="number" name="rect_bottom" value="900" min="0">
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Параметры -->
+            <div class="section">
+                <div class="section-title">Параметры</div>
+
+                <div class="field">
+                    <label>Непрозрачность</label>
+                    <div class="range-row">
+                        <input type="range" name="opacity" id="opacityRange"
+                               min="0" max="1" step="0.05" value="0.85"
+                               oninput="document.getElementById('opacityVal').textContent = this.value">
+                        <span class="range-value" id="opacityVal">0.85</span>
+                    </div>
+                </div>
+
+                <div class="row">
+                    <div class="field">
+                        <label for="tone">Тональность</label>
+                        <select name="tone" id="tone">
+                            <option value="warm" selected>Тёплая (warm)</option>
+                            <option value="cold">Холодная (cold)</option>
+                            <option value="neutral">Нейтральная (neutral)</option>
+                        </select>
+                    </div>
+
+                    <div class="field">
+                        <label for="darkness">Затемнение</label>
+                        <select name="darkness" id="darkness">
+                            <option value="light">Лёгкое (light)</option>
+                            <option value="medium" selected>Среднее (medium)</option>
+                            <option value="heavy">Сильное (heavy)</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="field">
+                    <label for="bitrate">Битрейт видео</label>
+                    <input type="text" name="bitrate" id="bitrate" value="3000k"
+                           placeholder="3000k">
+                </div>
+
+                <div class="row" style="margin-top: 4px;">
+                    <div class="checkbox-row">
+                        <input type="checkbox" name="preview" id="preview">
+                        <label for="preview">Только превью (один кадр, PNG)</label>
+                    </div>
+
+                    <div class="checkbox-row">
+                        <input type="checkbox" name="no_audio" id="no_audio">
+                        <label for="no_audio">Без аудио</label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Кнопка -->
+            <button type="submit" class="btn-submit" id="submitBtn">
+                Обработать
+            </button>
+
+            <div class="spinner" id="spinner">
+                <span class="spinner-icon"></span>
+                Обработка видео, подождите...
+            </div>
+        </form>
+    </div>
+
+    <script>
+        function switchMaskTab(panel) {
+            document.querySelectorAll('.mask-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.mask-panel').forEach(p => p.classList.remove('active'));
+            document.querySelector(`.mask-tab[data-panel="${panel}"]`).classList.add('active');
+            document.getElementById(`panel-${panel}`).classList.add('active');
+            document.getElementById('mask_mode').value = panel;
+
+            const maskInput = document.getElementById('mask');
+            if (panel === 'upload') {
+                maskInput.required = true;
+            } else {
+                maskInput.required = false;
+            }
+        }
+
+        document.getElementById('mainForm').addEventListener('submit', function() {
+            document.getElementById('submitBtn').disabled = true;
+            document.getElementById('submitBtn').textContent = 'Обработка...';
+            document.getElementById('spinner').classList.add('active');
+        });
+    </script>
+</body>
+</html>

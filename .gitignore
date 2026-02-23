@@ -2,3 +2,5 @@ test_data/
 __pycache__/
 *.pyc
 output_cinema.mp4
+uploads/
+results/
