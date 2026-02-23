@@ -141,7 +141,8 @@ def build_ffmpeg_command(
         f"[bg2]format=gray,"
         f"geq=lum='if(gt(lum(X,Y),200),255,0)',"
         f"boxblur=10[glare_mask];"
-        f"[bg3][glare_mask]alphamerge[glare_layer];"
+        f"[bg3]format=gray,format=rgba[bg3_neutral];"
+        f"[bg3_neutral][glare_mask]alphamerge[glare_layer];"
         f"[base][glare_layer]blend=all_mode=dodge:all_opacity={screen_opacity}[outv]"
     )
 
