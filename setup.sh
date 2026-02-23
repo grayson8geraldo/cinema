@@ -26,7 +26,7 @@ echo "[2/3] FFmpeg: $(ffmpeg -version | head -1)"
 
 # Установка Python-зависимостей
 echo "[3/3] Установка Python-пакетов..."
-pip install -r requirements.txt -q
+python3 -m pip install -r requirements.txt -q
 
 echo ""
 echo "=== Готово! ==="
