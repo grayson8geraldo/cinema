@@ -138,8 +138,8 @@ def build_ffmpeg_command(
     # 4. Применяем цветокоррекцию (curves) — отдельный шаг для совместимости с FFmpeg 8.x
     # 5. Накладываем результат поверх фона
     filter_complex = (
-        f"[1:v]scale={w}:{h}:force_original_aspect_ratio=decrease,"
-        f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black[scaled_vid];"
+        f"[1:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
+        f"crop={w}:{h}[scaled_vid];"
         f"[2:v]scale={w}:{h}[scaled_mask];"
         f"[scaled_vid][scaled_mask]alphamerge[masked_vid];"
         f"[masked_vid]colorchannelmixer=aa={opacity}[opacity_vid];"
