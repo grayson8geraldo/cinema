@@ -31,7 +31,7 @@ from flask import (
     url_for,
 )
 
-from compose import build_ffmpeg_command
+from compose import build_ffmpeg_command, get_mask_bbox
 from create_mask import create_mask
 
 app = Flask(__name__)
@@ -186,6 +186,7 @@ def process():
         ffmpeg = _find_tool("ffmpeg")
         bg_w, bg_h = _get_image_size(str(bg_path))
         vid_duration = _get_video_duration(str(video_path))
+        sx, sy, sw, sh = get_mask_bbox(str(mask_path))
 
         if preview:
             output_name = "result.png"
@@ -206,6 +207,10 @@ def process():
             preview=preview,
             bg_width=bg_w,
             bg_height=bg_h,
+            screen_x=sx,
+            screen_y=sy,
+            screen_w=sw,
+            screen_h=sh,
             video_duration=vid_duration,
         )
 
@@ -225,6 +230,10 @@ def process():
                     preview=preview,
                     bg_width=bg_w,
                     bg_height=bg_h,
+                    screen_x=sx,
+                    screen_y=sy,
+                    screen_w=sw,
+                    screen_h=sh,
                     video_duration=vid_duration,
                 )
                 result2 = subprocess.run(cmd_retry, capture_output=True, text=True)

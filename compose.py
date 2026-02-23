@@ -82,6 +82,23 @@ def get_video_duration(ffprobe: str, path: str) -> float:
     return float(data["format"]["duration"])
 
 
+def get_mask_bbox(mask_path: str) -> tuple[int, int, int, int]:
+    """Определяет bounding box белой области маски (экрана).
+
+    Возвращает (x, y, width, height) — положение и размер экрана внутри маски.
+    """
+    from PIL import Image
+
+    img = Image.open(mask_path).convert("L")
+    bbox = img.getbbox()  # (left, upper, right, lower) или None
+    if not bbox:
+        # Маска полностью чёрная — используем весь размер
+        w, h = img.size
+        return 0, 0, w, h
+    left, upper, right, lower = bbox
+    return left, upper, right - left, lower - upper
+
+
 def build_ffmpeg_command(
     ffmpeg: str,
     bg: str,
@@ -94,28 +111,34 @@ def build_ffmpeg_command(
     preview: bool,
     bg_width: int,
     bg_height: int,
+    screen_x: int,
+    screen_y: int,
+    screen_w: int,
+    screen_h: int,
     video_duration: float,
 ) -> list[str]:
     """Собирает команду FFmpeg для композитинга (извлечение блика)."""
 
     w, h = bg_width, bg_height
+    sx, sy, sw, sh = screen_x, screen_y, screen_w, screen_h
 
     # Фильтр-граф:
     # 1. Зацикливаем фон (split=3: для базы, для glare-маски, для извлечения блика)
     # 2. Из фона создаём контрастную ч/б маску (format=gray → curves=strong_contrast)
-    #    — яркие блики → белое, всё остальное → чёрное
-    # 3. Масштабируем видео, применяем маску экрана → overlay на фон
-    # 4. alphamerge фона с glare-маской → извлекаем только яркий блик
-    # 5. Накладываем блик поверх композита (overlay, альфа из glare-маски)
-    #    screen_opacity контролирует силу блика через масштаб альфа-канала
+    # 3. Масштабируем видео до размера ЭКРАНА (не всего фона!),
+    #    затем pad до полного размера фона с позиционированием в область экрана
+    # 4. alphamerge с маской — видео видно только в области экрана
+    # 5. alphamerge фона с glare-маской → извлекаем только яркий блик
+    # 6. Накладываем блик поверх композита
     filter_complex = (
         f"[0:v]loop=loop=-1:size=32767:start=0,split=3[bg1][bg2][bg3];"
         f"[2:v]loop=loop=-1:size=32767:start=0[mask_loop];"
         f"[bg1]format=gray,curves=strong_contrast[glare_mask];"
-        f"[1:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
-        f"crop={w}:{h}[scaled_vid];"
-        f"[scaled_vid][mask_loop]alphamerge[masked_vid];"
-        f"[bg2][masked_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[base_comp];"
+        f"[1:v]scale={sw}:{sh}:force_original_aspect_ratio=increase,"
+        f"crop={sw}:{sh},"
+        f"format=rgba,pad={w}:{h}:{sx}:{sy}:color=black@0[padded_vid];"
+        f"[padded_vid][mask_loop]alphamerge[masked_vid];"
+        f"[bg2][masked_vid]overlay=0:0:shortest=1[base_comp];"
         f"[bg3][glare_mask]alphamerge,"
         f"colorchannelmixer=aa={screen_opacity}[glare_only];"
         f"[base_comp][glare_only]overlay=0:0:format=auto[outv]"
@@ -188,6 +211,7 @@ def main() -> None:
 
     bg_w, bg_h = get_image_size(ffprobe, args.bg)
     vid_duration = get_video_duration(ffprobe, args.video)
+    sx, sy, sw, sh = get_mask_bbox(args.mask)
 
     if args.preview and not args.output.lower().endswith(".png"):
         args.output = Path(args.output).stem + "_preview.png"
@@ -204,6 +228,10 @@ def main() -> None:
         preview=args.preview,
         bg_width=bg_w,
         bg_height=bg_h,
+        screen_x=sx,
+        screen_y=sy,
+        screen_w=sw,
+        screen_h=sh,
         video_duration=vid_duration,
     )
 
@@ -212,6 +240,7 @@ def main() -> None:
     print(f"  Маска:    {args.mask}")
     print(f"  Видео:    {args.video}")
     print(f"  Выход:    {args.output}")
+    print(f"  Экран:    {sw}x{sh} @ ({sx},{sy})")
     print(f"  Битрейт:  {args.bitrate}")
     print(f"  Блик:     {args.screen_opacity}")
     print()
