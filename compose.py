@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 """
-Скрипт композитинга видео на экран кинотеатра.
+Скрипт композитинга видео на экран кинотеатра (Screen-режим, "сэндвич").
 
-Накладывает видео на фоновое изображение кинозала с использованием маски,
-полупрозрачности и цветокоррекции, имитируя проекцию на экран.
+Техника: фон → видео через маску (overlay) → повторный blend фона в режиме screen.
+Это создаёт естественный блик/свечение экрана поверх видео.
 
 Использование:
   python compose.py --bg cinema_bg.png --mask screen_mask.png --video input_video.mp4 -o output.mp4
@@ -13,10 +13,7 @@
   --mask      Маска экрана (чёрно-белая, того же размера что и фон)
   --video     Исходное видео для наложения
   -o          Выходной файл (по умолчанию: output_cinema.mp4)
-  --opacity   Непрозрачность видео 0.0-1.0 (по умолчанию: 0.85)
-  --bitrate   Битрейт выходного видео (по умолчанию: 3000k)
-  --tone      Тональность цветокоррекции: warm / cold / neutral (по умолчанию: warm)
-  --darkness  Степень затемнения: light / medium / heavy (по умолчанию: medium)
+  --bitrate   Битрейт выходного видео (по умолчанию: 3500k)
   --no-audio  Не включать аудиодорожку из видео
   --preview   Создать превью одного кадра (PNG) вместо видео
 """
@@ -80,79 +77,46 @@ def get_video_duration(ffprobe: str, path: str) -> float:
     return float(data["format"]["duration"])
 
 
-def get_curves_filter(tone: str, darkness: str) -> str:
-    """
-    Генерирует фильтр curves для цветокоррекции.
-
-    tone:     warm (тёплый, жёлто-оранжевый свет) / cold (холодный, синеватый) / neutral
-    darkness: light / medium / heavy
-    """
-    # Точки кривых разделены пробелами (не двоеточиями),
-    # чтобы избежать конфликта с : — разделителем опций FFmpeg.
-    # Каждый канал в отдельном вызове curves для совместимости с FFmpeg 8.x.
-    darkness_curves = {
-        "light":  "m='0/0 0.5/0.4 1/0.85'",
-        "medium": "m='0/0 0.5/0.35 1/0.75'",
-        "heavy":  "m='0/0 0.5/0.28 1/0.65'",
-    }
-
-    tone_curves = {
-        "warm":    "r='0/0 0.5/0.52 1/1':b='0/0 0.5/0.42 1/0.9'",
-        "cold":    "r='0/0 0.5/0.42 1/0.9':b='0/0 0.5/0.55 1/1'",
-        "neutral": "",
-    }
-
-    parts = [darkness_curves.get(darkness, darkness_curves["medium"])]
-    tc = tone_curves.get(tone, "")
-    if tc:
-        parts.append(tc)
-
-    return "curves=" + ":".join(parts)
-
-
 def build_ffmpeg_command(
     ffmpeg: str,
     bg: str,
     mask: str,
     video: str,
     output: str,
-    opacity: float,
     bitrate: str,
-    tone: str,
-    darkness: str,
     include_audio: bool,
     preview: bool,
     bg_width: int,
     bg_height: int,
     video_duration: float,
 ) -> list[str]:
-    """Собирает команду FFmpeg для композитинга."""
+    """Собирает команду FFmpeg для композитинга (Screen-режим, «сэндвич»)."""
 
-    curves = get_curves_filter(tone, darkness)
     w, h = bg_width, bg_height
 
-    # Фильтр-граф:
-    # 1. Масштабируем видео и маску до размера фона
-    # 2. Применяем маску (alphamerge) — видео видно только в области экрана
-    # 3. Применяем полупрозрачность (colorchannelmixer)
-    # 4. Применяем цветокоррекцию (curves) — отдельный шаг для совместимости с FFmpeg 8.x
-    # 5. Накладываем результат поверх фона
+    # Фильтр-граф «сэндвич»:
+    # 1. Зацикливаем статичные изображения (фон, маска) для работы с видеопотоком
+    # 2. Масштабируем видео до размера фона (cover + crop)
+    # 3. Применяем маску (alphamerge) — видео видно только в области экрана
+    # 4. Накладываем замаскированное видео на фон (overlay)
+    # 5. Повторный blend фона поверх композита в режиме screen —
+    #    создаёт блик/свечение экрана, имитируя реальную проекцию
     filter_complex = (
+        f"[0:v]loop=loop=-1:size=32767:start=0,split=2[bg1][bg2];"
+        f"[2:v]loop=loop=-1:size=32767:start=0[mask_loop];"
         f"[1:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
         f"crop={w}:{h}[scaled_vid];"
-        f"[2:v]scale={w}:{h}[scaled_mask];"
-        f"[scaled_vid][scaled_mask]alphamerge[masked_vid];"
-        f"[masked_vid]colorchannelmixer=aa={opacity}[opacity_vid];"
-        f"[opacity_vid]{curves}[corrected_vid];"
-        f"[0:v][corrected_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[outv]"
+        f"[scaled_vid][mask_loop]alphamerge[masked_vid];"
+        f"[bg1][masked_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[base_comp];"
+        f"[base_comp][bg2]blend=all_mode=screen[outv]"
     )
 
     cmd = [
         ffmpeg,
         "-y",
-        "-loop", "1", "-i", bg,
+        "-i", bg,
         "-i", video,
-        "-loop", "1", "-i", mask,
+        "-i", mask,
         "-filter_complex", filter_complex,
         "-map", "[outv]",
     ]
@@ -182,26 +146,14 @@ def build_ffmpeg_command(
 
 def main() -> None:
     parser = argparse.ArgumentParser(
-        description="Композитинг видео на экран кинотеатра.",
+        description="Композитинг видео на экран кинотеатра (Screen-режим).",
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("--bg", required=True, help="Фоновое изображение кинозала")
     parser.add_argument("--mask", required=True, help="Маска экрана (ч/б)")
     parser.add_argument("--video", required=True, help="Исходное видео")
     parser.add_argument("-o", "--output", default="output_cinema.mp4", help="Выходной файл")
-    parser.add_argument(
-        "--opacity", type=float, default=0.85,
-        help="Непрозрачность видео 0.0-1.0 (по умолчанию: 0.85)",
-    )
-    parser.add_argument("--bitrate", default="3000k", help="Битрейт видео (по умолчанию: 3000k)")
-    parser.add_argument(
-        "--tone", choices=["warm", "cold", "neutral"], default="warm",
-        help="Тональность: warm/cold/neutral (по умолчанию: warm)",
-    )
-    parser.add_argument(
-        "--darkness", choices=["light", "medium", "heavy"], default="medium",
-        help="Затемнение: light/medium/heavy (по умолчанию: medium)",
-    )
+    parser.add_argument("--bitrate", default="3500k", help="Битрейт видео (по умолчанию: 3500k)")
     parser.add_argument("--no-audio", action="store_true", help="Не включать аудио")
     parser.add_argument(
         "--preview", action="store_true",
@@ -209,10 +161,6 @@ def main() -> None:
     )
 
     args = parser.parse_args()
-
-    if args.opacity < 0.0 or args.opacity > 1.0:
-        print("Ошибка: --opacity должен быть в диапазоне 0.0 - 1.0", file=sys.stderr)
-        sys.exit(1)
 
     ffmpeg = check_ffmpeg()
     ffprobe = shutil.which("ffprobe")
@@ -234,10 +182,7 @@ def main() -> None:
         mask=args.mask,
         video=args.video,
         output=args.output,
-        opacity=args.opacity,
         bitrate=args.bitrate,
-        tone=args.tone,
-        darkness=args.darkness,
         include_audio=not args.no_audio,
         preview=args.preview,
         bg_width=bg_w,
@@ -250,9 +195,7 @@ def main() -> None:
     print(f"  Маска:    {args.mask}")
     print(f"  Видео:    {args.video}")
     print(f"  Выход:    {args.output}")
-    print(f"  Прозрачность: {args.opacity}")
-    print(f"  Тон:      {args.tone}")
-    print(f"  Затемнение:   {args.darkness}")
+    print(f"  Битрейт:  {args.bitrate}")
     print()
 
     result = subprocess.run(cmd, capture_output=True, text=True)

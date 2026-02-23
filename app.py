@@ -31,7 +31,7 @@ from flask import (
     url_for,
 )
 
-from compose import build_ffmpeg_command, get_curves_filter
+from compose import build_ffmpeg_command
 from create_mask import create_mask
 
 app = Flask(__name__)
@@ -169,20 +169,9 @@ def process():
             create_mask((bg_w, bg_h), polygon, str(mask_path))
 
         # --- Параметры ---
-        opacity = float(request.form.get("opacity", 0.85))
-        opacity = max(0.0, min(1.0, opacity))
-
-        tone = request.form.get("tone", "warm")
-        if tone not in ("warm", "cold", "neutral"):
-            tone = "warm"
-
-        darkness = request.form.get("darkness", "medium")
-        if darkness not in ("light", "medium", "heavy"):
-            darkness = "medium"
-
-        bitrate = request.form.get("bitrate", "3000k").strip()
+        bitrate = request.form.get("bitrate", "3500k").strip()
         if not bitrate:
-            bitrate = "3000k"
+            bitrate = "3500k"
 
         preview = request.form.get("preview") == "on"
         no_audio = request.form.get("no_audio") == "on"
@@ -205,10 +194,7 @@ def process():
             mask=str(mask_path),
             video=str(video_path),
             output=str(output_path),
-            opacity=opacity,
             bitrate=bitrate,
-            tone=tone,
-            darkness=darkness,
             include_audio=not no_audio,
             preview=preview,
             bg_width=bg_w,
@@ -226,10 +212,7 @@ def process():
                     mask=str(mask_path),
                     video=str(video_path),
                     output=str(output_path),
-                    opacity=opacity,
                     bitrate=bitrate,
-                    tone=tone,
-                    darkness=darkness,
                     include_audio=False,
                     preview=preview,
                     bg_width=bg_w,

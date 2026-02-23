@@ -125,7 +125,7 @@ def test_create_mask_from_json():
 
 
 def test_compose():
-    """Тест полного пайплайна композитинга."""
+    """Тест полного пайплайна композитинга (Screen-режим)."""
     bg_path = create_test_bg()
     video_path = create_test_video()
     mask_path = TEST_DIR / "screen_mask.png"
@@ -137,9 +137,6 @@ def test_compose():
         "--mask", str(mask_path),
         "--video", str(video_path),
         "-o", str(output_path),
-        "--opacity", "0.85",
-        "--tone", "warm",
-        "--darkness", "medium",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, f"compose.py failed: {result.stderr}\n{result.stdout}"
@@ -163,8 +160,6 @@ def test_compose_preview():
         "--video", str(video_path),
         "-o", str(output_path),
         "--preview",
-        "--tone", "cold",
-        "--darkness", "heavy",
     ]
     result = subprocess.run(cmd, capture_output=True, text=True)
     assert result.returncode == 0, f"compose.py --preview failed: {result.stderr}\n{result.stdout}"
@@ -175,32 +170,27 @@ def test_compose_preview():
     print("  OK")
 
 
-def test_compose_tones():
-    """Тест всех комбинаций тональности и затемнения."""
+def test_compose_no_audio():
+    """Тест без аудио."""
     bg_path = TEST_DIR / "cinema_bg.png"
     mask_path = TEST_DIR / "screen_mask.png"
     video_path = TEST_DIR / "test_video.mp4"
+    output_path = TEST_DIR / "output_no_audio.mp4"
 
-    for tone in ["warm", "cold", "neutral"]:
-        for darkness in ["light", "medium", "heavy"]:
-            output_path = TEST_DIR / f"output_{tone}_{darkness}.mp4"
-            cmd = [
-                sys.executable, "compose.py",
-                "--bg", str(bg_path),
-                "--mask", str(mask_path),
-                "--video", str(video_path),
-                "-o", str(output_path),
-                "--tone", tone,
-                "--darkness", darkness,
-                "--no-audio",
-            ]
-            result = subprocess.run(cmd, capture_output=True, text=True)
-            assert result.returncode == 0, (
-                f"compose.py --tone {tone} --darkness {darkness} failed: "
-                f"{result.stderr}\n{result.stdout}"
-            )
-            assert output_path.is_file()
-            print(f"  {tone}/{darkness}: OK")
+    cmd = [
+        sys.executable, "compose.py",
+        "--bg", str(bg_path),
+        "--mask", str(mask_path),
+        "--video", str(video_path),
+        "-o", str(output_path),
+        "--no-audio",
+    ]
+    result = subprocess.run(cmd, capture_output=True, text=True)
+    assert result.returncode == 0, (
+        f"compose.py --no-audio failed: {result.stderr}\n{result.stdout}"
+    )
+    assert output_path.is_file()
+    print("  OK")
 
 
 def main():
@@ -222,8 +212,8 @@ def main():
     print("Тест 5: Превью (один кадр)")
     test_compose_preview()
 
-    print("Тест 6: Все тональности и затемнения")
-    test_compose_tones()
+    print("Тест 6: Без аудио")
+    test_compose_no_audio()
 
     print("=" * 50)
     print("Все тесты пройдены!")
