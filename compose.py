@@ -123,25 +123,26 @@ def build_ffmpeg_command(
     sx, sy, sw, sh = screen_x, screen_y, screen_w, screen_h
 
     # Фильтр-граф:
-    # 1. Зацикливаем фон (split=3: для базы, для glare-маски, для извлечения блика)
-    # 2. Из фона создаём контрастную ч/б маску (format=gray → curves=strong_contrast)
-    # 3. Масштабируем видео до размера ЭКРАНА (не всего фона!),
-    #    затем pad до полного размера фона с позиционированием в область экрана
-    # 4. alphamerge с маской — видео видно только в области экрана
-    # 5. alphamerge фона с glare-маской → извлекаем только яркий блик
-    # 6. Накладываем блик поверх композита
+    # 1. Зацикливаем фон (split=3: для базы, glare-маски, glare-слоя)
+    # 2. Масштабируем видео до размера ЭКРАНА, pad до фона в позиции экрана
+    # 3. alphamerge с маской экрана — видео видно только в области экрана
+    # 4. overlay видео на фон → base
+    # 5. Из фона: geq порог яркости >200 → boxblur → glare_mask
+    # 6. alphamerge фона с glare_mask → glare_layer (только яркие пиксели фона)
+    # 7. blend dodge — блик светит поверх композита
     filter_complex = (
         f"[0:v]loop=loop=-1:size=32767:start=0,split=3[bg1][bg2][bg3];"
         f"[2:v]loop=loop=-1:size=32767:start=0[mask_loop];"
-        f"[bg1]format=gray,curves=strong_contrast[glare_mask];"
         f"[1:v]scale={sw}:{sh}:force_original_aspect_ratio=decrease,"
         f"pad={sw}:{sh}:(ow-iw)/2:(oh-ih)/2:color=black,"
         f"format=rgba,pad={w}:{h}:{sx}:{sy}:color=black@0[padded_vid];"
         f"[padded_vid][mask_loop]alphamerge[masked_vid];"
-        f"[bg2][masked_vid]overlay=0:0:shortest=1[base_comp];"
-        f"[bg3][glare_mask]alphamerge,"
-        f"colorchannelmixer=aa={screen_opacity}[glare_only];"
-        f"[base_comp][glare_only]overlay=0:0:format=auto[outv]"
+        f"[bg1][masked_vid]overlay=0:0:shortest=1[base];"
+        f"[bg2]format=gray,"
+        f"geq=lum='if(gt(lum(X,Y),200),255,0)',"
+        f"boxblur=10[glare_mask];"
+        f"[bg3][glare_mask]alphamerge[glare_layer];"
+        f"[base][glare_layer]blend=all_mode=dodge:all_opacity={screen_opacity}[outv]"
     )
 
     cmd = [
