@@ -174,9 +174,9 @@ def process():
             bitrate = "3500k"
 
         try:
-            screen_opacity = float(request.form.get("screen_opacity", 0.3))
+            screen_opacity = float(request.form.get("screen_opacity", 0.7))
         except (ValueError, TypeError):
-            screen_opacity = 0.3
+            screen_opacity = 0.7
         screen_opacity = max(0.0, min(1.0, screen_opacity))
 
         preview = request.form.get("preview") == "on"

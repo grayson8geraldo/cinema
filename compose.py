@@ -1,20 +1,24 @@
 #!/usr/bin/env python3
 """
-Скрипт композитинга видео на экран кинотеатра (Screen-режим, "сэндвич").
+Скрипт композитинга видео на экран кинотеатра (извлечение блика).
 
-Техника: фон → видео через маску (overlay) → повторный blend фона в режиме screen.
-Это создаёт естественный блик/свечение экрана поверх видео.
+Техника:
+  1. Из фона извлекается яркий блик через контрастную маску (format=gray → curves)
+  2. Видео накладывается на фон через маску экрана (overlay)
+  3. Извлечённый блик накладывается поверх композита (overlay с альфой)
+
+Это создаёт точечный блик только в ярких областях фона, без розовой заливки.
 
 Использование:
   python compose.py --bg cinema_bg.png --mask screen_mask.png --video input_video.mp4 -o output.mp4
 
 Параметры:
-  --bg        Фоновое изображение кинозала (9:16, например 1080x1920)
-  --mask      Маска экрана (чёрно-белая, того же размера что и фон)
-  --video     Исходное видео для наложения
-  -o          Выходной файл (по умолчанию: output_cinema.mp4)
+  --bg              Фоновое изображение кинозала (9:16, например 1080x1920)
+  --mask            Маска экрана (чёрно-белая, того же размера что и фон)
+  --video           Исходное видео для наложения
+  -o                Выходной файл (по умолчанию: output_cinema.mp4)
   --bitrate         Битрейт выходного видео (по умолчанию: 3500k)
-  --screen-opacity  Сила блика screen-blend 0.0-1.0 (по умолчанию: 0.3)
+  --screen-opacity  Сила блика 0.0-1.0 (по умолчанию: 0.7)
   --no-audio        Не включать аудиодорожку из видео
   --preview         Создать превью одного кадра (PNG) вместо видео
 """
@@ -92,26 +96,29 @@ def build_ffmpeg_command(
     bg_height: int,
     video_duration: float,
 ) -> list[str]:
-    """Собирает команду FFmpeg для композитинга (Screen-режим, «сэндвич»)."""
+    """Собирает команду FFmpeg для композитинга (извлечение блика)."""
 
     w, h = bg_width, bg_height
 
-    # Фильтр-граф «сэндвич»:
-    # 1. Зацикливаем статичные изображения (фон, маска) для работы с видеопотоком
-    # 2. Масштабируем видео до размера фона (cover + crop)
-    # 3. Применяем маску (alphamerge) — видео видно только в области экрана
-    # 4. Накладываем замаскированное видео на фон (overlay)
-    # 5. Повторный blend фона поверх композита в режиме screen —
-    #    создаёт блик/свечение экрана, имитируя реальную проекцию
-    #    all_opacity контролирует силу блика (0.0 = без блика, 1.0 = полный screen)
+    # Фильтр-граф:
+    # 1. Зацикливаем фон (split=3: для базы, для glare-маски, для извлечения блика)
+    # 2. Из фона создаём контрастную ч/б маску (format=gray → curves=strong_contrast)
+    #    — яркие блики → белое, всё остальное → чёрное
+    # 3. Масштабируем видео, применяем маску экрана → overlay на фон
+    # 4. alphamerge фона с glare-маской → извлекаем только яркий блик
+    # 5. Накладываем блик поверх композита (overlay, альфа из glare-маски)
+    #    screen_opacity контролирует силу блика через масштаб альфа-канала
     filter_complex = (
-        f"[0:v]loop=loop=-1:size=32767:start=0,split=2[bg1][bg2];"
+        f"[0:v]loop=loop=-1:size=32767:start=0,split=3[bg1][bg2][bg3];"
         f"[2:v]loop=loop=-1:size=32767:start=0[mask_loop];"
+        f"[bg1]format=gray,curves=strong_contrast[glare_mask];"
         f"[1:v]scale={w}:{h}:force_original_aspect_ratio=increase,"
         f"crop={w}:{h}[scaled_vid];"
         f"[scaled_vid][mask_loop]alphamerge[masked_vid];"
-        f"[bg1][masked_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[base_comp];"
-        f"[base_comp][bg2]blend=all_mode=screen:all_opacity={screen_opacity}[outv]"
+        f"[bg2][masked_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[base_comp];"
+        f"[bg3][glare_mask]alphamerge,"
+        f"colorchannelmixer=aa={screen_opacity}[glare_only];"
+        f"[base_comp][glare_only]overlay=0:0:format=auto[outv]"
     )
 
     cmd = [
@@ -158,8 +165,8 @@ def main() -> None:
     parser.add_argument("-o", "--output", default="output_cinema.mp4", help="Выходной файл")
     parser.add_argument("--bitrate", default="3500k", help="Битрейт видео (по умолчанию: 3500k)")
     parser.add_argument(
-        "--screen-opacity", type=float, default=0.3,
-        help="Сила блика screen-blend 0.0-1.0 (по умолчанию: 0.3)",
+        "--screen-opacity", type=float, default=0.7,
+        help="Сила блика 0.0-1.0 (по умолчанию: 0.7)",
     )
     parser.add_argument("--no-audio", action="store_true", help="Не включать аудио")
     parser.add_argument(
