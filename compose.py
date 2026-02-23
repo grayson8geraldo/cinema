@@ -87,19 +87,18 @@ def get_curves_filter(tone: str, darkness: str) -> str:
     tone:     warm (тёплый, жёлто-оранжевый свет) / cold (холодный, синеватый) / neutral
     darkness: light / medium / heavy
     """
-    # Базовые кривые затемнения (master channel)
-    # \: — экранированное двоеточие (разделитель точек кривой),
-    # чтобы не конфликтовать с : — разделителем опций FFmpeg
+    # Точки кривых разделены пробелами (не двоеточиями),
+    # чтобы избежать конфликта с : — разделителем опций FFmpeg.
+    # Каждый канал в отдельном вызове curves для совместимости с FFmpeg 8.x.
     darkness_curves = {
-        "light":  "m=0/0\\:0.5/0.4\\:1/0.85",
-        "medium": "m=0/0\\:0.5/0.35\\:1/0.75",
-        "heavy":  "m=0/0\\:0.5/0.28\\:1/0.65",
+        "light":  "m='0/0 0.5/0.4 1/0.85'",
+        "medium": "m='0/0 0.5/0.35 1/0.75'",
+        "heavy":  "m='0/0 0.5/0.28 1/0.65'",
     }
 
-    # Тональные кривые (RGB каналы)
     tone_curves = {
-        "warm":    "r=0/0\\:0.5/0.52\\:1/1:b=0/0\\:0.5/0.42\\:1/0.9",
-        "cold":    "r=0/0\\:0.5/0.42\\:1/0.9:b=0/0\\:0.5/0.55\\:1/1",
+        "warm":    "r='0/0 0.5/0.52 1/1':b='0/0 0.5/0.42 1/0.9'",
+        "cold":    "r='0/0 0.5/0.42 1/0.9':b='0/0 0.5/0.55 1/1'",
         "neutral": "",
     }
 
@@ -135,15 +134,17 @@ def build_ffmpeg_command(
     # Фильтр-граф:
     # 1. Масштабируем видео и маску до размера фона
     # 2. Применяем маску (alphamerge) — видео видно только в области экрана
-    # 3. Применяем полупрозрачность (colorchannelmixer aa=opacity) и цветокоррекцию
-    # 4. Накладываем результат поверх фона
+    # 3. Применяем полупрозрачность (colorchannelmixer)
+    # 4. Применяем цветокоррекцию (curves) — отдельный шаг для совместимости с FFmpeg 8.x
+    # 5. Накладываем результат поверх фона
     filter_complex = (
         f"[1:v]scale={w}:{h}:force_original_aspect_ratio=decrease,"
         f"pad={w}:{h}:(ow-iw)/2:(oh-ih)/2:color=black[scaled_vid];"
         f"[2:v]scale={w}:{h}[scaled_mask];"
         f"[scaled_vid][scaled_mask]alphamerge[masked_vid];"
-        f"[masked_vid]colorchannelmixer=aa={opacity},{curves}[transparent_vid];"
-        f"[0:v][transparent_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[outv]"
+        f"[masked_vid]colorchannelmixer=aa={opacity}[opacity_vid];"
+        f"[opacity_vid]{curves}[corrected_vid];"
+        f"[0:v][corrected_vid]overlay=(W-w)/2:(H-h)/2:shortest=1[outv]"
     )
 
     cmd = [
